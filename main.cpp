@@ -13,7 +13,7 @@
 #define APP0     0xE0
 #define DRI      0xDD    // Reset shift
 #define FF		 0xFF	 // TAG
-#define IN_NAME "gig-sn01.jpg"  // TAG
+#define IN_NAME "gig-sn08.jpg"  // TAG
 #define OUT_NAME "test.bmp"  // TAG
 
 
@@ -59,6 +59,7 @@ struct CQInfo{
 struct JPGData{
 
     const unsigned char* buffer; 
+    unsigned char* final_rgb;        // Final Red Green Blue pixel data
     unsigned char* final_r;        // Final Red Green Blue pixel data
     unsigned char* final_g;        // Final Red Green Blue pixel data
     unsigned char* final_b;        // Final Red Green Blue pixel data
@@ -74,6 +75,7 @@ struct JPGData{
     unsigned char Y[64*4];
     unsigned char Cr[64];
     unsigned char Cb[64];
+    
     unsigned char* cspace;
 };
 
@@ -579,8 +581,7 @@ void DecodeSingleBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
 }
 void YCrCB_to_RGB24_Block8x8(JPGData *imageData, int w, int h, int imgx, int imgy, int imgw, int imgh){
     const unsigned char *Y, *Cb, *Cr;
-    unsigned char *pix;
-
+	unsigned char *pix;
     int r, g, b;
 
     Y  = imageData->Y;
@@ -599,9 +600,9 @@ void YCrCB_to_RGB24_Block8x8(JPGData *imageData, int w, int h, int imgx, int img
 
     for (int y=0; y<(8*h - olh); y++){
         for (int x=0; x<(8*w - olw); x++){
-            int poff = x*3 + imageData->width*3*y;
+        	int poff = x*3 + imageData->width*3*y;
             pix = &(imageData->cspace[poff]);
-            
+        
             int yoff = x + y*(w*8);
             int coff = (int)(x*(1.0f/w)) + (int)(y*(1.0f/h))*8;
 
@@ -609,18 +610,17 @@ void YCrCB_to_RGB24_Block8x8(JPGData *imageData, int w, int h, int imgx, int img
             int cb = Cb[coff];
             int cr = Cr[coff];
 
-    		float red, green, blue;
-    		red   = y + 1.402f*(cb-128);
-    		green = y-0.34414f*(cr-128)-0.71414f*(cb-128);
-    		blue  = y+1.772f*(cr-128);
-
-    		r = (int) Clamp((int)red);
-    		g = (int) Clamp((int)green);
-    		b = (int) Clamp((int)blue);
+    		float red_pixel, green_pixel, blue_pixel;
+    		red_pixel   = y + 1.402f*(cb-128);
+    		green_pixel = y-0.34414f*(cr-128)-0.71414f*(cb-128);
+    		blue_pixel  = y+1.772f*(cr-128);
+    		
+    		int r = (int) Clamp((int)red_pixel);
+    		int g = (int) Clamp((int)green_pixel);
+    		int b = (int) Clamp((int)blue_pixel);
             pix[0] = Clamp(r);
             pix[1] = Clamp(g);
             pix[2] = Clamp(b);
-
         }
     }
 }
@@ -655,8 +655,8 @@ int ParseDataBit(JPGData* imageData){
 
     // RGB24:
     if (imageData->final_rgb == NULL){
-        int h = imageData->height*3;
-        int w = imageData->width*3;
+        int h = imageData->height;
+        int w = imageData->width;
         
 		//fprintf(stdout,"hFactor = %d \n",hFactor );
 		//fprintf(stdout,"vFactor = %d \n",vFactor );
@@ -667,10 +667,15 @@ int ParseDataBit(JPGData* imageData){
         int height = h + (8*hFactor) - (h%(8*hFactor)); //floating p exception
         int width  = w + (8*vFactor) - (w%(8*vFactor)); //floating p exception
       
-        imageData->final_rgb = new unsigned char[width * height];
+        imageData->final_rgb = new unsigned char[width*3 * height*3];
+        imageData->final_r = new unsigned char[width * height];
+		imageData->final_g = new unsigned char[width * height];
+		imageData->final_b = new unsigned char[width * height];
 
-		
-        memset(imageData->final_rgb, 0, width*height);
+		memset(imageData->final_rgb, 0, width*height);
+        memset(imageData->final_r, 0, width*height);
+        memset(imageData->final_g, 0, width*height);
+        memset(imageData->final_b, 0, width*height);
     }
     imageData->cqinfo[1].last = 0;
     imageData->cqinfo[2].last = 0;
@@ -689,8 +694,8 @@ int ParseDataBit(JPGData* imageData){
     {
         for (int x=0; x<(int)imageData->width; x+=xstride_by_mcu)
         {
-            imageData->cspace = imageData->final_rgb + x*3 + (y *imageData->width*3);
-
+        	imageData->cspace = imageData->final_rgb + x*3 + (y *imageData->width*3);
+        
             DecodeMCU(imageData,hFactor,vFactor);
             YCrCB_to_RGB24_Block8x8(imageData, hFactor, vFactor, x, y, imageData->width, imageData->height);
         }
@@ -700,26 +705,130 @@ int ParseDataBit(JPGData* imageData){
 }
 void PrintRGB(JPGData* imageData){
 	//testing
-	/*
+	
 	int Width = imageData->width;
 	int Height = imageData->height;
 	unsigned char* RGB = imageData->final_rgb;
 	for (int y=Height-1; y>=0; y--){
         for (int x=0; x<Width; x++){
             int i = (x + (Width)*y) * 3;
-            unsigned int rgbpix = (RGB[i]<<16)|(RGB[i+1]<<8)|(RGB[i+2]<<0);
-            fprintf(stdout,"%d",rgbpix);
+            int rgb_i = (x + (Width)*y);
+            //unsigned int rgbpix = (RGB[i]<<16)|(RGB[i+1]<<8)|(RGB[i+2]<<0);
+            imageData->final_r[rgb_i] = RGB[i]>>16;
+            imageData->final_g[rgb_i] = RGB[i+1]>>8;
+            imageData->final_b[rgb_i] = RGB[i+2]>>0;
+            //fprintf(stdout,"%d",rgbpix);
             //fwrite(&rgbpix, 3, 1, fp);
         }
         fprintf(stdout,"\b",NULL);
     }
-	*/
+	
+}
+
+void AlongMethod(JPGData* imageData){
+	const char* szBmpFileName ="along.bmp";
+	int Width = imageData->width;
+	int Height= imageData->height;
+	unsigned char* RGB = imageData->final_rgb;
+
+    // Round up the width to the nearest DWORD boundary
+    int iNumPaddedBytes = 4 - (Width * 3) % 4;
+    iNumPaddedBytes = iNumPaddedBytes % 4;
+
+    BMPFH bh;
+    memset(&bh, 0, sizeof(bh));
+    bh.bmtype[0]='B';
+    bh.bmtype[1]='M';
+    bh.iFileSize = (Width*Height*3) + (Height*iNumPaddedBytes) + sizeof(bh);
+    bh.iOffsetBits = sizeof(BMPFH);
+    bh.iSizeHeader = 40;
+    bh.iPlanes = 1;
+    bh.iWidth = Width;
+    bh.iHeight = Height;
+    bh.iBitCount = 24;
+
+
+    char temp[1024]={0};
+    sprintf(temp, "%s", szBmpFileName);
+    FILE* fp = fopen(temp, "wb");
+    fwrite(&bh, sizeof(bh), 1, fp);
+    for (int y=Height-1; y>=0; y--)
+    {
+        for (int x=0; x<Width; x++)
+        {
+            int i = (x + (Width)*y) * 3;
+            unsigned int rgbpix = (RGB[i]>>16)|(RGB[i+1]>>8)|(RGB[i+2]>>0);
+            fwrite(&rgbpix, 3, 1, fp);
+        }
+        if (iNumPaddedBytes>0)
+        {
+            unsigned char pad = 0;
+            fwrite(&pad, iNumPaddedBytes, 1, fp);
+        }
+    }
+    fclose(fp);
 }
 void RecoverImage(JPGData* imageData){
+	PrintRGB(imageData);
+	
+	unsigned char* red = imageData->final_r;
+	unsigned char* green = imageData->final_g;
+	unsigned char* blue = imageData->final_b;
+	int w = imageData->width;
+	int h = imageData->height;
+	FILE *f;
+	unsigned char *img = NULL;
+	int filesize = 54 + 3*w*h;  //w is your image width, h is image height, both int
+	if( img ){
+    	free( img );
+    }
+	img = (unsigned char *)malloc(3*w*h);
+	memset(img,0,sizeof(unsigned char)*3*w*h);
 
+	int i,j;
+	for(int i=0; i<w; i++){
+    	for(int j=0; j<h; j++){
+    	int x=i;
+    	int y=(h-1)-j;
+    	int idx = x+y*w;
+    	int r = red[idx];
+    	int g = green[idx];
+    	int b = blue[idx];
+    	img[(x+y*w)*3+2] = (unsigned char)(r);
+    	img[(x+y*w)*3+1] = (unsigned char)(g);
+    	img[(x+y*w)*3+0] = (unsigned char)(b);
+		}
+	}
 
+	unsigned char bmpfileheader[14] = {'B','M', 0,0,0,0, 0,0, 0,0, 54,0,0,0};
+	unsigned char bmpinfoheader[40] = {40,0,0,0, 0,0,0,0, 0,0,0,0, 1,0, 24,0};
+	unsigned char bmppad[3] = {0,0,0};
+
+	bmpfileheader[ 2] = (unsigned char)(filesize    );
+	bmpfileheader[ 3] = (unsigned char)(filesize>> 8);
+	bmpfileheader[ 4] = (unsigned char)(filesize>>16);
+	bmpfileheader[ 5] = (unsigned char)(filesize>>24);
+
+	bmpinfoheader[ 4] = (unsigned char)(       w    );
+	bmpinfoheader[ 5] = (unsigned char)(       w>> 8);
+	bmpinfoheader[ 6] = (unsigned char)(       w>>16);
+	bmpinfoheader[ 7] = (unsigned char)(       w>>24);
+	bmpinfoheader[ 8] = (unsigned char)(       h    );
+	bmpinfoheader[ 9] = (unsigned char)(       h>> 8);
+	bmpinfoheader[10] = (unsigned char)(       h>>16);
+	bmpinfoheader[11] = (unsigned char)(       h>>24);
+
+	f = fopen(OUT_NAME,"wb");
+	fwrite(	bmpfileheader,1,14,f);
+	fwrite(bmpinfoheader,1,40,f);
+	for(i=0; i<h; i++){
+    	fwrite(img+(w*(h-i-1)*3),3,w,f);
+    	fwrite(bmppad,1,(4-(w*3)%4)%4,f);
+	}
+	fclose(f);
+	
+	AlongMethod(imageData);
 }
-
 int main(){
     FILE *fp;
     //const char* fileName = "teatime.jpg";
