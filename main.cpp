@@ -13,10 +13,24 @@
 #define APP0     0xE0
 #define DRI      0xDD    // Reset shift
 #define FF		 0xFF	 // TAG
+#define IN_NAME "gig-sn01.jpg"  // TAG
+#define OUT_NAME "test.bmp"  // TAG
+
 
 #define MASK 	 0xF  // MAC
 
 #define BYTE_TO_WORD(x) (((x)[0]<<8)|(x)[1])
+
+static int ZZidx[64] = {
+    0,   1,   5,  6,   14,  15,  27,  28,
+    2,   4,   7,  13,  16,  26,  29,  42,
+    3,   8,  12,  17,  25,  30,  41,  43,
+    9,   11, 18,  24,  31,  40,  44,  53,
+    10,  19, 23,  32,  39,  45,  52,  54,
+    20,  22, 33,  38,  46,  51,  55,  60,
+    21,  34, 37,  47,  50,  56,  59,  61,
+    35,  36, 48,  49,  57,  58,  62,  63,
+};
 
 struct Block{
      int value;                    // Decodes to.
@@ -35,16 +49,19 @@ struct CQInfo{
     int samplingFactor;
     int vFactor;
     int hFactor;
-    float * qTable;
     int last;
+    float* qTable;
     HTable* DCHT;
     HTable* ACHT;
+    short int DCT_buffer[65];
 };
 
 struct JPGData{
 
     const unsigned char* buffer; 
-    unsigned char* final_rgb;        // Final Red Green Blue pixel data
+    unsigned char* final_r;        // Final Red Green Blue pixel data
+    unsigned char* final_g;        // Final Red Green Blue pixel data
+    unsigned char* final_b;        // Final Red Green Blue pixel data
     unsigned int   width;            // Width of image
     unsigned int   height;           // Height of image
 	CQInfo cqinfo[4];
@@ -57,13 +74,37 @@ struct JPGData{
     unsigned char Y[64*4];
     unsigned char Cr[64];
     unsigned char Cb[64];
-    unsigned char * cspace;
+    unsigned char* cspace;
+};
+
+struct BMPFH{
+        // BitmapFileHeader
+        char         bmtype[2];     // 2 bytes - 'B' 'M'
+        unsigned int iFileSize;     // 4 bytes
+        short int    reserved1;     // 2 bytes
+        short int    reserved2;     // 2 bytes
+        unsigned int iOffsetBits;   // 4 bytes
+        // End of stBMFH structure - size of 14 bytes
+        // BitmapInfoHeader
+        unsigned int iSizeHeader;    // 4 bytes - 40
+        unsigned int iWidth;         // 4 bytes
+        unsigned int iHeight;        // 4 bytes
+        short int    iPlanes;        // 2 bytes
+        short int    iBitCount;      // 2 bytes
+        unsigned int Compression;    // 4 bytes
+        unsigned int iSizeImage;     // 4 bytes
+        unsigned int iXPelsPerMeter; // 4 bytes
+        unsigned int iYPelsPerMeter; // 4 bytes
+        unsigned int iClrUsed;       // 4 bytes
+        unsigned int iClrImportant;  // 4 bytes
+        // End of stBMIF structure - size 40 bytes
+        // Total size - 54 bytes
 };
 typedef struct CQInfo CQInfo;
 typedef struct JPGData JPGData;
 typedef struct HTable HTable;
 typedef struct Block Block;
-
+typedef struct BMPFH BMPFH;
 
 int FileSize(FILE *fp){
     long pos;
@@ -100,15 +141,8 @@ void generateHC( int num_codes, Block* block_array, unsigned char* value ){
     }
 }
 void ParseHT(const unsigned char *huffman_bits, HTable* ht){
-	//int counter;
     for (int j=1; j<=16; j++) {
         ht->length[j] = huffman_bits[j];
-        
-        
-        //for(int ci=0;ci<ht->length[j];ci++){
-        //	fprintf(stdout,"%02X",ht->value[counter]);
-        //	counter++;
-        //}
 		
     }
     
@@ -117,13 +151,11 @@ void ParseHT(const unsigned char *huffman_bits, HTable* ht){
         numOfBlocks += ht->length[i];
     }
     ht->numOfBlocks = numOfBlocks;
-	//fprintf(stdout,"numOfBlocks %d\n", numOfBlocks);
+	fprintf(stdout,"ht->numOfBlocks %d\n", ht->numOfBlocks);
     
     int c=0;
-    for (int i=0; i<16; i++)
-    {
-        for (int j=0; j<ht->length[i]; j++)
-        {
+    for (int i=0; i<16; i++){
+        for (int j=0; j<ht->length[i]; j++){
             ht->blocks[c].length = i;
             c++;
         }
@@ -133,10 +165,8 @@ void ParseHT(const unsigned char *huffman_bits, HTable* ht){
 }
 void ParseQTable(JPGData *imageData,int qindex){
     int c = 0;
-    for (int i=0; i<8; i++) 
-    {
-        for (int j=0; j<8; j++) 
-        {
+    for (int i=0; i<8; i++) {
+        for (int j=0; j<8; j++) {
             unsigned char value = imageData->buffer[c];
 
             imageData->QTable[qindex][c] = value;
@@ -238,12 +268,15 @@ int ParseSOS(JPGData *imageData){
     for (int i=0;i<nr_components;i++) {
         unsigned int cid   = *imageData->buffer++;
         unsigned int table = *imageData->buffer++;
-		fprintf(stdout,"SOS : nr %d cid %d table ac/dc = %d %d \n", i,cid,table&0xf,table>>4);
+		fprintf(stdout,"SOS : nr %d cid %d table dc/ac = %d %d \n", i,cid,table>>4,table&0xf);
         
-        fprintf(stdout,"SOS : ACHT location %p\n", &imageData->ACHT[table&0xf]);
-        fprintf(stdout,"SOS : DCHT location %p\n", &imageData->DCHT[table>>4]);
+        //fprintf(stdout,"SOS : DCHT location %p\n", &imageData->DCHT[table>>4]);
+        //fprintf(stdout,"SOS : ACHT location %p\n", &imageData->ACHT[table&0xf]);
         imageData->cqinfo[cid].ACHT = &imageData->ACHT[table&0xf];
         imageData->cqinfo[cid].DCHT = &imageData->DCHT[table>>4];
+        fprintf(stdout,"SOS : DCHT numOfBlocks %d\n", imageData->cqinfo[cid].DCHT->numOfBlocks );
+        fprintf(stdout,"SOS : ACHT numOfBlocks %d\n", imageData->cqinfo[cid].ACHT->numOfBlocks );
+        
     }
     imageData->buffer+=3;// basic jpeg always 0x00,0x3F,0x00
 	
@@ -264,17 +297,17 @@ int ParseSOF(JPGData *imageData){
         int samplingFactor 		= *imageData->buffer++;
         int qTable         		= *imageData->buffer++;
         
-		CQInfo* new_cqinfo = &imageData->cqinfo[i];
+		CQInfo* new_cqinfo = &imageData->cqinfo[i+1];
 		new_cqinfo->colorQ_id 	= colorQ_id;
 		new_cqinfo->samplingFactor 	= samplingFactor;
 		new_cqinfo->vFactor = samplingFactor & 0xf;
 		new_cqinfo->hFactor = samplingFactor >> 4;
 		new_cqinfo->qTable  = imageData->QTable[qTable];
 
-		fprintf(stdout,"colorQ_id  %u\n", imageData->cqinfo[i].colorQ_id);
-		fprintf(stdout,"vFactor %u\n", imageData->cqinfo[i].vFactor);
-		fprintf(stdout,"hFactor %u\n", imageData->cqinfo[i].hFactor);
-		fprintf(stdout,"qTable %p\n", imageData->cqinfo[i].qTable);
+		fprintf(stdout,"colorQ_id  %u\n", imageData->cqinfo[i+1].colorQ_id);
+		fprintf(stdout,"vFactor %u\n", imageData->cqinfo[i+1].vFactor);
+		fprintf(stdout,"hFactor %u\n", imageData->cqinfo[i+1].hFactor);
+		fprintf(stdout,"qTable %p\n", imageData->cqinfo[i+1].qTable);
     }
     imageData->width = width;
     imageData->height = height;
@@ -329,13 +362,296 @@ int ParseHeader(JPGData* imageData){
 	
 	return 1;
 }
-int  DecodeMCU(JPGData* imageData){
+
+
+//Bit Parsing part
+unsigned int g_reservoir = 0;
+unsigned int g_nbits_in_reservoir = 0;
+void FillNBits(const unsigned char** stream, int& nbits_wanted){
+    while ((int)g_nbits_in_reservoir<nbits_wanted){
+        const unsigned char c = *(*stream)++;
+        g_reservoir <<= 8;
+        if (c == 0xff && (**stream) == 0x00)
+            (*stream)++;
+        g_reservoir |= c;
+        g_nbits_in_reservoir+=8;
+    }
+}
+short GetNBits(const unsigned char** buffer, int nbits_wanted){
+    FillNBits(buffer, nbits_wanted);
+    
+    short result = ((g_reservoir)>>(g_nbits_in_reservoir-(nbits_wanted))); 
+
+    g_nbits_in_reservoir -= (nbits_wanted); 
+    g_reservoir &= ((1U<<g_nbits_in_reservoir)-1);
+    return result;
+}
+
+int LookNBits(const unsigned char** buffer, int nbits_wanted){
+    FillNBits(buffer, nbits_wanted);
+    int result = ((g_reservoir)>>(g_nbits_in_reservoir-(nbits_wanted)));
+    return result;
+}
+
+void SkipNBits(const unsigned char** buffer, int& nbits_wanted){
+    FillNBits(buffer, nbits_wanted);
+    g_nbits_in_reservoir -= (nbits_wanted); 
+    g_reservoir &= ((1U<<g_nbits_in_reservoir)-1);
+}
+
+bool IsInHuffmanCodes(int code, int numCodeBits, int numBlocks, Block* blocks, int* outValue){
+    for (int j=0; j<numBlocks; j++){
+        int hufhCode        = blocks[j].code;
+        int hufCodeLenBits    = blocks[j].length;
+        int hufValue        = blocks[j].value;
+
+        if ((code==hufhCode) && (numCodeBits==hufCodeLenBits)){
+            *outValue = hufValue;
+            return true;
+        }
+    }
+    return false;
+}
+int DetermineSign(int val, int nBits){
+    bool negative = val < (1<<(nBits-1));
+    if (negative){
+        val = val + (-1 << (nBits)) + 1; 
+    }
+    return val;
+}
+
+void PrintDCT(short dct[64]){
+    fprintf(stdout,"DCT value: \n",NULL);
+    int c = 0;
+    for (int i=0; i<64; i++){
+    	fprintf(stdout,"%4d ",dct[c++] );
+
+        if ( (c>0) && (c%8==0) ) {
+        	fprintf(stdout,"\n",NULL );
+        }
+    }
+    fprintf(stdout,"\n",NULL );
+}
+void ParseHuffmanDataUnit(JPGData *imageData, int indx){
+	//indx = indx-1;
+	//fprintf(stdout,"ParseHuffmanDataUnit : indx = %d\n",indx);
+    CQInfo *c = &imageData->cqinfo[indx];
+
+    short DCT_tcoeff[64];
+    memset(DCT_tcoeff, 0, sizeof(DCT_tcoeff)); //Initialize DCT_tcoeff
+
+    bool found = false;
+    int decodedValue = 0;
+
+    for (int k=1; k<16; k++){
+        int code = LookNBits(&imageData->buffer, k);
+        
+    	//fprintf(stdout,"ParseHuffmanDataUnit : code = %d, k = %d\n",code,k);
+    	//fprintf(stdout,"ParseHuffmanDataUnit : numOfBlocks = %d\n",c->DCHT->numOfBlocks);
+        if (IsInHuffmanCodes(code, k,  c->DCHT->numOfBlocks, c->DCHT->blocks, &decodedValue)){
+            SkipNBits(&imageData->buffer, k);
+            found = true;
+            int numDataBits = decodedValue;
+            if (numDataBits==0){
+                DCT_tcoeff[0] = c->last;
+            }
+            else{
+                short data = GetNBits(&imageData->buffer, numDataBits);
+                data = DetermineSign(data, numDataBits);
+                DCT_tcoeff[0] = data + c->last;
+                c->last = DCT_tcoeff[0];
+            }
+            break;
+        }
+    }
+    
+    // Second, the 63 AC coefficient
+    int nr=1; 
+    bool EOB_found=false;
+    while ( (nr<=63)&&(!EOB_found) ){
+        int k = 0;
+        for (k=1; k<=16; k++){
+            // Keep grabbing one bit at a time till we find one thats a huffman code
+            int code = LookNBits(&imageData->buffer, k);
+
+
+            // Check if its one of our huffman codes
+            if (IsInHuffmanCodes(code, k,  c->ACHT->numOfBlocks, c->ACHT->blocks, &decodedValue)){
+
+                SkipNBits(&imageData->buffer, k);
+                int valCode = decodedValue;
+
+                unsigned char size_val = valCode&0xf; 
+                unsigned char count_0  = valCode>>4;  
+
+                if (size_val==0) {// RLE 
+                    if (count_0==0)EOB_found=true;    // EOB found, go out
+                    else if (count_0==0xf) nr+=16;  // skip 16 zeros
+                }
+                else{
+                    nr+=count_0; //skip count_0 zeroes
+                    short data = GetNBits(&imageData->buffer, size_val );
+                    data = DetermineSign(data, size_val);
+                    DCT_tcoeff[nr++]=data;
+                }
+                break;
+            }
+        }
+
+        if (k>16){    
+            nr++;
+        }
+    }
+
+	//testing printing
+    //PrintDCT(DCT_tcoeff);
+    
+    for (int j = 0; j < 64; j++){
+        c->DCT_buffer[j] = DCT_tcoeff[j];
+    }
+}
+float C(int u){
+    if (u == 0)
+         return (1.0f/sqrtf(2));
+    else
+         return 1.0f;
+}
+int func(int x, int y, const int block[8][8]){
+    const float PI = 3.14f;
+    float sum=0;
+    for( int u=0; u<8; u++){
+         for(int v=0; v<8; v++){
+             sum += ( C(u) * C(v) ) * block[u][v] * cosf( ((2*x+1) * u * PI) / 16)  * cosf( ((2*y+1) * v * PI) / 16);
+         }
+    }         
+    return (int) ((1.0/4.0) * sum);
+}
+inline unsigned char Clamp(int i){
+    if (i<0){
+        return 0;
+    }
+    else if (i>255){
+        return 255;
+    }
+    else{
+        return i;
+    }
+}   
+void DecodeSingleBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
+    short* inptr    = cq->DCT_buffer;
+    float* quantptr = cq->qTable;
+
+
+    int tmp[64] = {0};
+	int block[64] = {0};
+    
+    // Quantizing
+    for (int i=0; i<64; i++){
+        tmp[i] = inptr[i];
+        tmp[i] = (int)( inptr[i] * quantptr[i]);
+    }
+    // De-Zig-Zaging
+   	for( int i=0; i<64; i++){
+        block[i] = tmp[ZZidx[i]];
+    }
+
+    // Create an 8x8 array, Inverse DCT
+    int arrayBlock[8][8]={0};
+    int cc = 0;
+    int val[8][8]={0};
+    for( int y=0; y<8; y++){
+        for( int x=0; x<8; x++){
+            arrayBlock[x][y]  =  block[cc];
+            cc++;
+            val[x][y]  =  func( x, y, arrayBlock);
+        }
+    }
+
+    unsigned char *outptr = outputBuf;
+    for (int y = 0; y < 8; y++) {
+        for (int x=0; x<8; x++){
+            val[x][y] += 128;
+            outptr[x] = Clamp(val[x][y]);
+        }
+        outptr += stride;
+    }
+    
+}
+void YCrCB_to_RGB24_Block8x8(JPGData *imageData, int w, int h, int imgx, int imgy, int imgw, int imgh){
+    const unsigned char *Y, *Cb, *Cr;
+    unsigned char *pix;
+
+    int r, g, b;
+
+    Y  = imageData->Y;
+    Cb = imageData->Cb;
+    Cr = imageData->Cr;
+
+    int olw = 0; // overlap
+    if ( imgx > (imgw-8*w) ){
+        olw = imgw-imgx;
+    }
+
+    int olh = 0; // overlap
+    if ( imgy > (imgh-8*h) ){
+        olh = imgh-imgy;
+    }
+
+    for (int y=0; y<(8*h - olh); y++){
+        for (int x=0; x<(8*w - olw); x++){
+            int poff = x*3 + imageData->width*3*y;
+            pix = &(imageData->cspace[poff]);
+            
+            int yoff = x + y*(w*8);
+            int coff = (int)(x*(1.0f/w)) + (int)(y*(1.0f/h))*8;
+
+            int yc =  Y[yoff];
+            int cb = Cb[coff];
+            int cr = Cr[coff];
+
+    		float red, green, blue;
+    		red   = y + 1.402f*(cb-128);
+    		green = y-0.34414f*(cr-128)-0.71414f*(cb-128);
+    		blue  = y+1.772f*(cr-128);
+
+    		r = (int) Clamp((int)red);
+    		g = (int) Clamp((int)green);
+    		b = (int) Clamp((int)blue);
+            pix[0] = Clamp(r);
+            pix[1] = Clamp(g);
+            pix[2] = Clamp(b);
+
+        }
+    }
+}
+
+int  DecodeMCU(JPGData* imageData,int hFactor,int vFactor){
+    for (int y=0; y<vFactor; y++){
+        for (int x=0; x<hFactor; x++)
+        {
+            int stride = hFactor*8;
+            int offset = x*8 + y*64*hFactor;
+
+            ParseHuffmanDataUnit(imageData, 1);
+
+            DecodeSingleBlock(&imageData->cqinfo[1], &imageData->Y[offset], stride);
+        }
+    }
+
+    // Cb
+    ParseHuffmanDataUnit(imageData, 2);
+    DecodeSingleBlock(&imageData->cqinfo[2], imageData->Cb, 8);
+
+    // Cr
+    ParseHuffmanDataUnit(imageData, 3);
+    DecodeSingleBlock(&imageData->cqinfo[3], imageData->Cr, 8);
+
 	return 1;
 }
 int ParseDataBit(JPGData* imageData){
 	fprintf(stdout,"Parsing bits\n",NULL);
-    int hFactor = imageData->cqinfo[0].hFactor;
-    int vFactor = imageData->cqinfo[0].vFactor;
+    int hFactor = imageData->cqinfo[1].hFactor;
+    int vFactor = imageData->cqinfo[1].vFactor;
 
     // RGB24:
     if (imageData->final_rgb == NULL){
@@ -356,9 +672,9 @@ int ParseDataBit(JPGData* imageData){
 		
         memset(imageData->final_rgb, 0, width*height);
     }
-    imageData->cqinfo[0].last = 0;
     imageData->cqinfo[1].last = 0;
     imageData->cqinfo[2].last = 0;
+    imageData->cqinfo[3].last = 0;
 
     int xstride_by_mcu = 8*hFactor;
     int ystride_by_mcu = 8*vFactor;
@@ -375,21 +691,39 @@ int ParseDataBit(JPGData* imageData){
         {
             imageData->cspace = imageData->final_rgb + x*3 + (y *imageData->width*3);
 
-            DecodeMCU(imageData);
-            //YCrCB_to_RGB24_Block8x8(jdata, hFactor, vFactor, x, y, jdata->m_width, jdata->m_height);
+            DecodeMCU(imageData,hFactor,vFactor);
+            YCrCB_to_RGB24_Block8x8(imageData, hFactor, vFactor, x, y, imageData->width, imageData->height);
         }
     }
 
 	return 1;
 }
-int RecoverImage(JPGData* imageData){
-	fprintf(stdout,"Image Recovring\n",NULL);
-	return 1;
+void PrintRGB(JPGData* imageData){
+	//testing
+	/*
+	int Width = imageData->width;
+	int Height = imageData->height;
+	unsigned char* RGB = imageData->final_rgb;
+	for (int y=Height-1; y>=0; y--){
+        for (int x=0; x<Width; x++){
+            int i = (x + (Width)*y) * 3;
+            unsigned int rgbpix = (RGB[i]<<16)|(RGB[i+1]<<8)|(RGB[i+2]<<0);
+            fprintf(stdout,"%d",rgbpix);
+            //fwrite(&rgbpix, 3, 1, fp);
+        }
+        fprintf(stdout,"\b",NULL);
+    }
+	*/
 }
+void RecoverImage(JPGData* imageData){
+
+
+}
+
 int main(){
     FILE *fp;
     //const char* fileName = "teatime.jpg";
-    const char* fileName = "monalisa.jpg";
+    const char* fileName = IN_NAME;
     unsigned char *buffer;
 	unsigned char* rgb2darray = NULL;
     unsigned int width  = 0;
