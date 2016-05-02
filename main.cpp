@@ -12,9 +12,11 @@
 #define EOI      0xD9    // End of Image, or End of File
 #define APP0     0xE0
 #define DRI      0xDD    // Reset shift
+#define COM		 0xFE    // Comments
 #define FF		 0xFF	 // TAG
-#define IN_NAME "gig-sn08.jpg"  // TAG
-#define OUT_NAME "test.bmp"  // TAG
+#define IN_NAME "teatime.jpg"  // TAG
+#define OUT_1_NAME "output1.bmp"  // TAG
+#define OUT_2_NAME "output2.bmp"  // TAG
 
 
 #define MASK 	 0xF  // MAC
@@ -172,6 +174,7 @@ void ParseQTable(JPGData *imageData,int qindex){
             unsigned char value = imageData->buffer[c];
 
             imageData->QTable[qindex][c] = value;
+            fprintf(stdout,"[%d][%d] = %d\n",qindex,c,value);
             c++;
         }
     }	
@@ -179,11 +182,19 @@ void ParseQTable(JPGData *imageData,int qindex){
 }
 int ParseAPP0(JPGData *imageData){
 	int len = BYTE_TO_WORD(imageData->buffer);
+	fprintf(stdout,"len  %d\n",len);
+	imageData->buffer+=len;
+    return 0;
+}
+int ParseCOM(JPGData *imageData){
+	int len = BYTE_TO_WORD(imageData->buffer);
+	fprintf(stdout,"len  %d\n",len);
 	imageData->buffer+=len;
     return 0;
 }
 int ParseDQT(JPGData *imageData){
-	int length_DB = BYTE_TO_WORD(imageData->buffer);
+	int len = BYTE_TO_WORD(imageData->buffer);
+	fprintf(stdout,"len  %d\n",len);
 	int qi;
 	float* qt;
 	//imageData->buffer+=length_DB;
@@ -195,9 +206,10 @@ int ParseDQT(JPGData *imageData){
 	while (length>0){
         qi = *imageData->buffer++;
 
-        int qprecision = qi>>4;     // upper 4 bits specify the precision
-        int qindex     = qi&0xf; // index is lower 4 bits
-
+        int qprecision = qi>>4;  
+        int qindex     = qi&0xf; 
+		fprintf(stdout,"DQT qprecision : %d\n", qprecision);
+		fprintf(stdout,"DQT qindex 	   : %d\n", qindex);
         ParseQTable(imageData,qindex);
         imageData->buffer += 64;
         length -= 65;
@@ -205,8 +217,8 @@ int ParseDQT(JPGData *imageData){
     return 0;	
 }
 int ParseDHT(JPGData *imageData){
-	int length_DC = BYTE_TO_WORD(imageData->buffer);
-	//imageData->buffer+=length_DC;
+	int len = BYTE_TO_WORD(imageData->buffer);
+	fprintf(stdout,"len  %d\n",len);
 	
 	
     unsigned int count, i;
@@ -261,8 +273,7 @@ int ParseDHT(JPGData *imageData){
 }
 int ParseSOS(JPGData *imageData){
 	int len = BYTE_TO_WORD(imageData->buffer);
-	//imageData->buffer+=len;
-    fprintf(stdout,"SOS : length %d\n", len);
+	fprintf(stdout,"len  %d\n",len);
 	unsigned int nr_components = imageData->buffer[2];
 
     imageData->buffer += 3; //skip length(2) + color_number(1)
@@ -285,7 +296,8 @@ int ParseSOS(JPGData *imageData){
 	return 0;
 }
 int ParseSOF(JPGData *imageData){
-	//int len = BYTE_TO_WORD(imageData->buffer);
+	int len = BYTE_TO_WORD(imageData->buffer);
+	fprintf(stdout,"len  %d\n",len);
 	//imageData->buffer+=len;
 	
     int height = BYTE_TO_WORD(imageData->buffer+3);
@@ -309,7 +321,7 @@ int ParseSOF(JPGData *imageData){
 		fprintf(stdout,"colorQ_id  %u\n", imageData->cqinfo[i+1].colorQ_id);
 		fprintf(stdout,"vFactor %u\n", imageData->cqinfo[i+1].vFactor);
 		fprintf(stdout,"hFactor %u\n", imageData->cqinfo[i+1].hFactor);
-		fprintf(stdout,"qTable %p\n", imageData->cqinfo[i+1].qTable);
+		fprintf(stdout,"qTable %d\n", qTable);
     }
     imageData->width = width;
     imageData->height = height;
@@ -353,7 +365,12 @@ int ParseHeader(JPGData* imageData){
   					ParseSOS(imageData);
   					reachSOS=true;
      			break;
+     			case COM: // FE
+     				fprintf(stdout,"FF%02X\n",c2);
+     				ParseCOM(imageData);
+     			break;
   				default:
+  					fprintf(stdout,"FF%02X\n",c2);
   					;
 			}
 		}
@@ -703,9 +720,11 @@ int ParseDataBit(JPGData* imageData){
 
 	return 1;
 }
-void PrintRGB(JPGData* imageData){
+void ConvertToRGB(JPGData* imageData){
 	//testing
-	
+	FILE* R = fopen("R.txt","wb");;
+	FILE* G = fopen("G.txt","wb");;
+	FILE* B = fopen("B.txt","wb");;
 	int Width = imageData->width;
 	int Height = imageData->height;
 	unsigned char* RGB = imageData->final_rgb;
@@ -714,62 +733,26 @@ void PrintRGB(JPGData* imageData){
             int i = (x + (Width)*y) * 3;
             int rgb_i = (x + (Width)*y);
             //unsigned int rgbpix = (RGB[i]<<16)|(RGB[i+1]<<8)|(RGB[i+2]<<0);
-            imageData->final_r[rgb_i] = RGB[i]>>16;
-            imageData->final_g[rgb_i] = RGB[i+1]>>8;
-            imageData->final_b[rgb_i] = RGB[i+2]>>0;
+            imageData->final_r[rgb_i] = (RGB[i]<<16);
+            imageData->final_g[rgb_i] = (RGB[i+1]<<8);
+            imageData->final_b[rgb_i] = (RGB[i+2]<<0);
+            fprintf(R,"%d,",(RGB[i]<<16));
+            fprintf(G,"%d,",(RGB[i+1]<<8));
+            fprintf(B,"%d,",(RGB[i+2]<<0));
             //fprintf(stdout,"%d",rgbpix);
             //fwrite(&rgbpix, 3, 1, fp);
         }
-        fprintf(stdout,"\b",NULL);
+        
+        fprintf(R,"\n",NULL);
+        fprintf(G,"\n",NULL);
+        fprintf(B,"\n",NULL);
+        //fprintf(stdout,"\n",NULL);
     }
 	
 }
-
-void AlongMethod(JPGData* imageData){
-	const char* szBmpFileName ="along.bmp";
-	int Width = imageData->width;
-	int Height= imageData->height;
-	unsigned char* RGB = imageData->final_rgb;
-
-    // Round up the width to the nearest DWORD boundary
-    int iNumPaddedBytes = 4 - (Width * 3) % 4;
-    iNumPaddedBytes = iNumPaddedBytes % 4;
-
-    BMPFH bh;
-    memset(&bh, 0, sizeof(bh));
-    bh.bmtype[0]='B';
-    bh.bmtype[1]='M';
-    bh.iFileSize = (Width*Height*3) + (Height*iNumPaddedBytes) + sizeof(bh);
-    bh.iOffsetBits = sizeof(BMPFH);
-    bh.iSizeHeader = 40;
-    bh.iPlanes = 1;
-    bh.iWidth = Width;
-    bh.iHeight = Height;
-    bh.iBitCount = 24;
-
-
-    char temp[1024]={0};
-    sprintf(temp, "%s", szBmpFileName);
-    FILE* fp = fopen(temp, "wb");
-    fwrite(&bh, sizeof(bh), 1, fp);
-    for (int y=Height-1; y>=0; y--)
-    {
-        for (int x=0; x<Width; x++)
-        {
-            int i = (x + (Width)*y) * 3;
-            unsigned int rgbpix = (RGB[i]>>16)|(RGB[i+1]>>8)|(RGB[i+2]>>0);
-            fwrite(&rgbpix, 3, 1, fp);
-        }
-        if (iNumPaddedBytes>0)
-        {
-            unsigned char pad = 0;
-            fwrite(&pad, iNumPaddedBytes, 1, fp);
-        }
-    }
-    fclose(fp);
-}
 void RecoverImage(JPGData* imageData){
-	PrintRGB(imageData);
+	fprintf(stdout,"Recovering Image\n",NULL);
+	ConvertToRGB(imageData);
 	
 	unsigned char* red = imageData->final_r;
 	unsigned char* green = imageData->final_g;
@@ -818,7 +801,7 @@ void RecoverImage(JPGData* imageData){
 	bmpinfoheader[10] = (unsigned char)(       h>>16);
 	bmpinfoheader[11] = (unsigned char)(       h>>24);
 
-	f = fopen(OUT_NAME,"wb");
+	f = fopen(OUT_1_NAME,"wb");
 	fwrite(	bmpfileheader,1,14,f);
 	fwrite(bmpinfoheader,1,40,f);
 	for(i=0; i<h; i++){
@@ -827,12 +810,48 @@ void RecoverImage(JPGData* imageData){
 	}
 	fclose(f);
 	
-	AlongMethod(imageData);
+	
+	//Another output method
+	
+	unsigned char* RGB = imageData->final_rgb;
+	int iNumPaddedBytes = (4 - (w * 3) % 4)%4;
+
+	FILE* fp = fopen(OUT_2_NAME,"wb");
+	fwrite(bmpfileheader,1,14,fp);
+	fwrite(bmpinfoheader,1,40,fp);
+	for (int y=h-1; y>=0; y--){
+        for (int x=0; x<w; x++){
+            int i = (x + (w)*y) * 3;
+            unsigned int rgbpix = (RGB[i]<<16)|(RGB[i+1]<<8)|(RGB[i+2]<<0);
+            fprintf(stdout,"[%3d %3d %3d],",RGB[i]<<16,RGB[i+1]<<8,RGB[i+2]<<0);
+            fwrite(&rgbpix, 3, 1, fp);
+        }
+        fprintf(stdout,"\n",NULL);
+        if (iNumPaddedBytes>0)
+        {
+            unsigned char pad = 0;
+            fwrite(&pad, iNumPaddedBytes, 1, fp);
+        }
+    }
+    fclose(fp);
+    fprintf(stderr,"File output to output1.bmp,output2.bmp\n",NULL);
+	
 }
-int main(){
+int main(int argc, char *argv[]){
     FILE *fp;
+    const char* fileName;
+ 	const char* fileName_out;
+ 	//fprintf(stderr,"argc == %d\n", argc);
+    if(argc >= 2){
+    	fileName = argv[1];
+    	fprintf(stderr,"Input filename is = %s\n", fileName);
+    }
+    else{
+    	fileName = "teatime.jpg";
+    	fprintf(stderr,"No input filename, using default image = %s\n", fileName);
+    }
     //const char* fileName = "teatime.jpg";
-    const char* fileName = IN_NAME;
+    
     unsigned char *buffer;
 	unsigned char* rgb2darray = NULL;
     unsigned int width  = 0;
@@ -855,17 +874,6 @@ int main(){
    		ParseHeader(imageData);
    		ParseDataBit(imageData);
    		RecoverImage(imageData);
-		//Get the  DC coefficient and the 63 AC coefficients.
-		//Then we dezigzag the block.
-		//Add the last DC coefficient to the current DC coefficient
-		//Next we dequantize the block
-		//Next we perform the Inverse Discrete Cosine Transform .
-		//Finally, we shift the block by adding 128 to each value in the block
-		//Merge all the blocks to get the final block .
-
-    	
-    		
-    	
     
         return 1;
     }
