@@ -4,6 +4,15 @@
 #include <math.h> 
 #include <stdlib.h>
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+
 #define DQT      0xDB    // Define Quantization Table
 #define SOF      0xC0    // Start of Frame (size information)
 #define DHT      0xC4    // Huffman Table
@@ -842,7 +851,8 @@ int main(int argc, char *argv[]){
     	strcpy(fileName ,argv[1]);
     	strcpy(fileName_out ,argv[1]);
     	
-    	fprintf(stderr,"Input filename is = %s\n", fileName);
+    	fprintf(stderr,"%s***************************************************%s\n",KGRN,KWHT);
+    	fprintf(stderr,"Input filename is = %s\n\n", fileName);
     	fileName_out[strlen(fileName)-4]='.';
     	fileName_out[strlen(fileName)-3]='b';
     	fileName_out[strlen(fileName)-2]='m';
@@ -851,7 +861,8 @@ int main(int argc, char *argv[]){
     }
     else{
 
-    	fprintf(stderr,"No input filename, using default picture %s\n", fileName);
+    	fprintf(stderr,"%s***************************************************%s\n",KGRN,KWHT);
+    	fprintf(stderr,"No input filename, using default picture %s\n\n", fileName);
     	
     }
     //strcat(fileName_out,fileName);
@@ -868,19 +879,24 @@ int main(int argc, char *argv[]){
 
     fp = fopen(fileName, "rb"); 
     if (fp == NULL){
-        fprintf(stderr,"Cannot open jpg file: %s\n", fileName);
-        return 0;
+    	fprintf(stderr,"%s***************************************************%s\n",KGRN,KWHT);
+        fprintf(stderr,"Cannot open jpg file: %s\n\n", fileName);
     }
     else{
    		//Read bit-by-bit  from the file to get the  DC coefficient, non-zero AC coefficients and the run lengths.
    		
     	fileSize = FileSize(fp);
-    	fprintf(stderr,"Found file: %s with size %d\n", fileName,fileSize);
+    	fprintf(stderr,"Found  file: %s%s %swith size %s%d%s Bytes\n",KRED, fileName,KWHT,KYEL,fileSize,KWHT);
     	imageData->buffer = readFileToBuffer(fp,fileSize);
+    	
+    	fprintf(stderr,"%sDecoding...%s", KBLU,KWHT);
+    	
    		ParseHeader(imageData);
    		ParseDataBit(imageData);
    		RecoverImage(imageData,fileName_out);
-    	fprintf(stderr,"Output filename is = %s\n", fileName_out);
-        return 0;
+   		fprintf(stderr,"\r", NULL);
+    	fprintf(stderr,"Output file: %s%s%s\n", KRED,fileName_out,KWHT);
     }
+    fprintf(stderr,"\n%s***************************************************%s\n",KGRN,KWHT);
+    return 0;
 }

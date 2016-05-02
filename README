@@ -23,21 +23,26 @@
 
 
 all:
-	g++ ./main.cpp -o main.o
-	./main.o teatime.jpg
-	./main.o monalisa.jpg
-	./main.o gig-sn01.jpg
-	./main.o gig-sn08.jpg
+	clear
+	@echo "ITCT-2016-Midterm : \nR03944030 羅國宣\n"
+	@g++ ./main.cpp -o main.o
+	@./main.o teatime.jpg
+	@./main.o monalisa.jpg
+	@./main.o gig-sn01.jpg
+	@./main.o gig-sn08.jpg
 compile:
-	g++ ./main.cpp -o main.o
+	clear
+	@echo "ITCT-2016-Midterm : \nR03944030 羅國宣\n"
+	@g++ ./main.cpp -o main.o
 run:
-	./main.o teatime.jpg
-	./main.o monalisa.jpg
-	./main.o gig-sn01.jpg
-	./main.o gig-sn08.jpg
+	clear
+	@echo "ITCT-2016-Midterm : \nR03944030 羅國宣\n"
+	@./main.o teatime.jpg
+	@./main.o monalisa.jpg
+	@./main.o gig-sn01.jpg
+	@./main.o gig-sn08.jpg
 	
 clean:
 	rm -rf ./*.bmp
 	rm -rf ./*.txt	
 	rm -rf ./*.o	
-
