@@ -1,3 +1,43 @@
+#HOW TO RUN THE CODE
+# 	Name : Kuo-Hsuan LO 
+#	School ID: R03944030
+#
+#0. make -f README 
+#	This command will simply compile,run all the test data.
+#
+#
+#1. make -f README clean
+#	This command will clean all the output file such as *.bmp , *.o , *.txt
+#
+#
+#2. If you want to run a single file, the compiled program could be run as ./main <YOUR_JPG_FILE_NAME>
+#
+#
+#3. g++ environments
+#	> g++ -v
+#	> 	Configured with: --prefix=/Library/Developer/CommandLineTools/usr --with-gxx-include-dir=/usr/include/c++/4.2.1
+#	> 	Apple LLVM version 6.0 (clang-600.0.56) (based on LLVM 3.5svn)
+#	> 	Target: x86_64-apple-darwin14.1.0
+#	> 	Thread model: posix
+#
+
+
 all:
-	g++ ./main.cpp -o main
-	./main
+	g++ ./main.cpp -o main.o
+	./main.o teatime.jpg
+	./main.o monalisa.jpg
+	./main.o gig-sn01.jpg
+	./main.o gig-sn08.jpg
+compile:
+	g++ ./main.cpp -o main.o
+run:
+	./main.o teatime.jpg
+	./main.o monalisa.jpg
+	./main.o gig-sn01.jpg
+	./main.o gig-sn08.jpg
+	
+clean:
+	rm -rf ./*.bmp
+	rm -rf ./*.txt	
+	rm -rf ./*.o	
+

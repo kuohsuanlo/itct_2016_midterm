@@ -833,28 +833,29 @@ void RecoverImage(JPGData* imageData,const char* fileName_out){
     //fprintf(stderr,"File output to output1.bmp,output2.bmp\n",NULL);
 	
 }
-void DecodeJPG(const char* fileName){
-
-
-
-}
 int main(int argc, char *argv[]){
     FILE *fp;
-    const char* fileName;
- 	char fileName_out[80];
+ 	char fileName[80] = "teatime.jpg";
+ 	char fileName_out[80] = "teatime.bmp";
  	//fprintf(stderr,"argc == %d\n", argc);
     if(argc >= 2){
-    	fileName = argv[1];
+    	strcpy(fileName ,argv[1]);
+    	strcpy(fileName_out ,argv[1]);
+    	
     	fprintf(stderr,"Input filename is = %s\n", fileName);
+    	fileName_out[strlen(fileName)-4]='.';
+    	fileName_out[strlen(fileName)-3]='b';
+    	fileName_out[strlen(fileName)-2]='m';
+    	fileName_out[strlen(fileName)-1]='p';
+    	fileName_out[strlen(fileName)]='\0';
     }
     else{
 
-    	fprintf(stderr,"No input filename, using 4 default pictures %s\n", fileName);
+    	fprintf(stderr,"No input filename, using default picture %s\n", fileName);
     	
-    	fileName = "teatime.jpg";
     }
-    strcat(fileName_out,fileName);
-    strcat(fileName_out,".bmp");
+    //strcat(fileName_out,fileName);
+    //strcat(fileName_out,".bmp");
     //const char* fileName = "teatime.jpg";
     
     unsigned char *buffer;
@@ -880,6 +881,6 @@ int main(int argc, char *argv[]){
    		ParseDataBit(imageData);
    		RecoverImage(imageData,fileName_out);
     	fprintf(stderr,"Output filename is = %s\n", fileName_out);
-        return 1;
+        return 0;
     }
 }
