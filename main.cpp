@@ -80,35 +80,10 @@ struct JPGData{
     
     unsigned char* cspace;
 };
-
-struct BMPFH{
-        // BitmapFileHeader
-        char         bmtype[2];     // 2 bytes - 'B' 'M'
-        unsigned int iFileSize;     // 4 bytes
-        short int    reserved1;     // 2 bytes
-        short int    reserved2;     // 2 bytes
-        unsigned int iOffsetBits;   // 4 bytes
-        // End of stBMFH structure - size of 14 bytes
-        // BitmapInfoHeader
-        unsigned int iSizeHeader;    // 4 bytes - 40
-        unsigned int iWidth;         // 4 bytes
-        unsigned int iHeight;        // 4 bytes
-        short int    iPlanes;        // 2 bytes
-        short int    iBitCount;      // 2 bytes
-        unsigned int Compression;    // 4 bytes
-        unsigned int iSizeImage;     // 4 bytes
-        unsigned int iXPelsPerMeter; // 4 bytes
-        unsigned int iYPelsPerMeter; // 4 bytes
-        unsigned int iClrUsed;       // 4 bytes
-        unsigned int iClrImportant;  // 4 bytes
-        // End of stBMIF structure - size 40 bytes
-        // Total size - 54 bytes
-};
 typedef struct CQInfo CQInfo;
 typedef struct JPGData JPGData;
 typedef struct HTable HTable;
 typedef struct Block Block;
-typedef struct BMPFH BMPFH;
 
 int FileSize(FILE *fp){
     long pos;
@@ -147,7 +122,7 @@ void generateHC( int num_codes, Block* block_array, unsigned char* value ){
 void ParseHT(const unsigned char *huffman_bits, HTable* ht){ //Done, no parsing bug
     for (int j=0; j<16; j++) {
         ht->length[j] = huffman_bits[j];
-        //fprintf(stdout,"huffman_bits[%d] == %d\n", j,ht->length[j]);		
+        ////fprintf(stdout,"huffman_bits[%d] == %d\n", j,ht->length[j]);		
     }
     
     
@@ -157,14 +132,14 @@ void ParseHT(const unsigned char *huffman_bits, HTable* ht){ //Done, no parsing 
     }
     
     ht->numOfBlocks = numOfBlocks;
-	//fprintf(stdout,"ht->numOfBlocks %d\n", ht->numOfBlocks);
+	////fprintf(stdout,"ht->numOfBlocks %d\n", ht->numOfBlocks);
     
     
     int c=0;
     for (int i=0; i<16; i++){
         for (int j=0; j<ht->length[i]; j++){
             ht->blocks[c].length = i+1;
-            //fprintf(stdout,"ht->blocks[%d].length == %d\n", c,ht->blocks[c].length);
+            ////fprintf(stdout,"ht->blocks[%d].length == %d\n", c,ht->blocks[c].length);
             c++;
         }
 
@@ -178,7 +153,7 @@ void ParseQTable(JPGData *imageData,int qindex){ //Done, no parsing bug
             unsigned char value = imageData->buffer[c];
 
             imageData->QTable[qindex][c] = value;
-            //fprintf(stdout,"[%d][%d] = %d\n",qindex,c,value);
+            ////fprintf(stdout,"[%d][%d] = %d\n",qindex,c,value);
             c++;
         }
     }	
@@ -186,19 +161,19 @@ void ParseQTable(JPGData *imageData,int qindex){ //Done, no parsing bug
 }
 int ParseAPP0(JPGData *imageData){ //Done, no parsing bug
 	int len = BYTE_TO_WORD(imageData->buffer);
-	fprintf(stdout,"len  %d\n",len);
+	//fprintf(stdout,"len  %d\n",len);
 	imageData->buffer+=len;
     return 0;
 }
 int ParseCOM(JPGData *imageData){ //Done, no parsing bug
 	int len = BYTE_TO_WORD(imageData->buffer);
-	fprintf(stdout,"len  %d\n",len);
+	//fprintf(stdout,"len  %d\n",len);
 	imageData->buffer+=len;
     return 0;
 }
 int ParseDQT(JPGData *imageData){ //Done, no parsing bug
 	int len = BYTE_TO_WORD(imageData->buffer);
-	fprintf(stdout,"len  %d\n",len);
+	//fprintf(stdout,"len  %d\n",len);
 	int qi;
 	float* qt;
 	//imageData->buffer+=length_DB;
@@ -212,8 +187,8 @@ int ParseDQT(JPGData *imageData){ //Done, no parsing bug
 
         int qprecision = qi>>4;  
         int qindex     = qi&0xf; 
-		fprintf(stdout,"DQT qprecision : %d\n", qprecision);
-		fprintf(stdout,"DQT qindex 	   : %d\n", qindex);
+		//fprintf(stdout,"DQT qprecision : %d\n", qprecision);
+		//fprintf(stdout,"DQT qindex 	   : %d\n", qindex);
         ParseQTable(imageData,qindex);
         imageData->buffer += 64;
         length -= 65;
@@ -222,7 +197,7 @@ int ParseDQT(JPGData *imageData){ //Done, no parsing bug
 }
 int ParseDHT(JPGData *imageData){ //Done, no parsing bug
 	int len = BYTE_TO_WORD(imageData->buffer);
-	fprintf(stdout,"len  %d\n",len);
+	//fprintf(stdout,"len  %d\n",len);
 	
 	
     unsigned int count, i;
@@ -246,24 +221,24 @@ int ParseDHT(JPGData *imageData){ //Done, no parsing bug
         
         //imageData->buffer += count;  //Using the following part to read byte and++
         if (index & 0xf0 ){ // 1-> AC
-        	fprintf(stdout,"DHT AC : \n", NULL);
+        	//fprintf(stdout,"DHT AC : \n", NULL);
         	unsigned char* huffval = imageData->ACHT[index&0xf].value;
             for (i = 0; i < count; i++){
                 huffval[i] = *imageData->buffer++;
-                fprintf(stdout,"%02X ", imageData->ACHT[index&0xf].value[i]);
+                //fprintf(stdout,"%02X ", imageData->ACHT[index&0xf].value[i]);
 			}
-        	fprintf(stdout,"to ParseHT\n", NULL);
+        	//fprintf(stdout,"to ParseHT\n", NULL);
             ParseHT(huff_bits, &imageData->ACHT[index&0xf]); // AC
         
         }
         else{ // 0 -> DC
-        	fprintf(stdout,"DHT DC : \n", NULL);
+        	//fprintf(stdout,"DHT DC : \n", NULL);
         	unsigned char* huffval = imageData->DCHT[index&0xf].value;
             for (i = 0; i < count; i++){
                 huffval[i] = *imageData->buffer++;
-                fprintf(stdout,"%02X ", imageData->DCHT[index&0xf].value[i]);
+                //fprintf(stdout,"%02X ", imageData->DCHT[index&0xf].value[i]);
 			}
-        	fprintf(stdout,"to ParseHT\n", NULL);
+        	//fprintf(stdout,"to ParseHT\n", NULL);
             ParseHT(huff_bits, &imageData->DCHT[index&0xf]);    //DC    
         }
 
@@ -275,11 +250,11 @@ int ParseDHT(JPGData *imageData){ //Done, no parsing bug
 }
 int ParseSOS(JPGData *imageData){ //Done, no parsing bug
 	int len = BYTE_TO_WORD(imageData->buffer);
-	fprintf(stdout,"len  %d\n",len);
+	//fprintf(stdout,"len  %d\n",len);
 	unsigned int nr_components = imageData->buffer[2];
 
     imageData->buffer += 3; //skip length(2) + color_number(1)
-    //fprintf(stdout,"SOS : %d\n", nr_components);
+    ////fprintf(stdout,"SOS : %d\n", nr_components);
     for (int i=0;i<nr_components;i++) {
         unsigned int cid   = *imageData->buffer++;
         unsigned int tid = *imageData->buffer++;
@@ -287,8 +262,8 @@ int ParseSOS(JPGData *imageData){ //Done, no parsing bug
         imageData->cqinfo[cid].DCHT = &imageData->DCHT[tid&0xf];
         imageData->cqinfo[cid].ACHT = &imageData->ACHT[tid>>4];
         
-        fprintf(stdout,"SOS : DCHT numOfBlocks %d\n", imageData->cqinfo[cid].DCHT->numOfBlocks );
-        fprintf(stdout,"SOS : ACHT numOfBlocks %d\n", imageData->cqinfo[cid].ACHT->numOfBlocks );
+        //fprintf(stdout,"SOS : DCHT numOfBlocks %d\n", imageData->cqinfo[cid].DCHT->numOfBlocks );
+        //fprintf(stdout,"SOS : ACHT numOfBlocks %d\n", imageData->cqinfo[cid].ACHT->numOfBlocks );
         
     }
     imageData->buffer+=3;// basic jpeg always 0x00,0x3F,0x00
@@ -297,7 +272,7 @@ int ParseSOS(JPGData *imageData){ //Done, no parsing bug
 }
 int ParseSOF(JPGData *imageData){ //Done, no parsing bug
 	int len = BYTE_TO_WORD(imageData->buffer);
-	fprintf(stdout,"len  %d\n",len);
+	//fprintf(stdout,"len  %d\n",len);
 	//imageData->buffer+=len;
 	
     int height = BYTE_TO_WORD(imageData->buffer+3);
@@ -319,16 +294,16 @@ int ParseSOF(JPGData *imageData){ //Done, no parsing bug
 		new_cqinfo->qTable  = imageData->QTable[qTable];
 
 		/*
-		fprintf(stdout,"colorQ_id  %u\n", imageData->cqinfo[i+1].colorQ_id);
-		fprintf(stdout,"vFactor %u\n", imageData->cqinfo[i+1].vFactor);
-		fprintf(stdout,"hFactor %u\n", imageData->cqinfo[i+1].hFactor);
-		fprintf(stdout,"qTable %f\n", *imageData->cqinfo[i+1].qTable);
+		//fprintf(stdout,"colorQ_id  %u\n", imageData->cqinfo[i+1].colorQ_id);
+		//fprintf(stdout,"vFactor %u\n", imageData->cqinfo[i+1].vFactor);
+		//fprintf(stdout,"hFactor %u\n", imageData->cqinfo[i+1].hFactor);
+		//fprintf(stdout,"qTable %f\n", *imageData->cqinfo[i+1].qTable);
 		*/
     }
     imageData->width = width;
     imageData->height = height;
-	//fprintf(stdout,"width  %d\n", imageData->width);
-	//fprintf(stdout,"height %d\n", imageData->height);
+	////fprintf(stdout,"width  %d\n", imageData->width);
+	////fprintf(stdout,"height %d\n", imageData->height);
 	
     return 0;
 }
@@ -343,36 +318,36 @@ int ParseHeader(JPGData* imageData){
 			imageData->buffer++;
 			switch (c2){
   				case SOI: //D8
-					fprintf(stdout,"FF%02X\n",c2);
+					//fprintf(stdout,"FF%02X\n",c2);
      			break;
   				case APP0://E0
-					fprintf(stdout,"FF%02X\n",c2);
+					//fprintf(stdout,"FF%02X\n",c2);
   					ParseAPP0(imageData);
 					//Skip 
      			break;
   				case DQT: //DB
-					fprintf(stdout,"FF%02X\n",c2);
+					//fprintf(stdout,"FF%02X\n",c2);
   					ParseDQT(imageData);
      			break;
   				case SOF: //C0
-					fprintf(stdout,"FF%02X\n",c2);
+					//fprintf(stdout,"FF%02X\n",c2);
   					ParseSOF(imageData);
      			break;
   				case DHT: //C4
-					fprintf(stdout,"FF%02X\n",c2);
+					//fprintf(stdout,"FF%02X\n",c2);
   					ParseDHT(imageData);
      			break;
   				case SOS: //DA
-					fprintf(stdout,"FF%02X\n",c2);
+					//fprintf(stdout,"FF%02X\n",c2);
   					ParseSOS(imageData);
   					reachSOS=true;
      			break;
      			case COM: // FE
-     				fprintf(stdout,"FF%02X\n",c2);
+     				//fprintf(stdout,"FF%02X\n",c2);
      				ParseCOM(imageData);
      			break;
   				default:
-  					fprintf(stdout,"FF%02X\n",c2);
+  					//fprintf(stdout,"FF%02X\n",c2);
   					;
 			}
 		}
@@ -442,20 +417,20 @@ int DetermineSign(int val, int nBits){
 }
 
 void PrintDCT(short dct[64]){
-    fprintf(stdout,"DCT value: \n",NULL);
+    //fprintf(stdout,"DCT value: \n",NULL);
     int c = 0;
     for (int i=0; i<64; i++){
-    	fprintf(stdout,"%4d ",dct[c++] );
+    	//fprintf(stdout,"%4d ",dct[c++] );
 
         if ( (c>0) && (c%8==0) ) {
-        	fprintf(stdout,"\n",NULL );
+        	//fprintf(stdout,"\n",NULL );
         }
     }
-    fprintf(stdout,"\n",NULL );
+    //fprintf(stdout,"\n",NULL );
 }
 void ParseHuffmanDataUnit(JPGData *imageData, int indx){
 	//indx = indx-1;
-	//fprintf(stdout,"ParseHuffmanDataUnit : indx = %d\n",indx);
+	////fprintf(stdout,"ParseHuffmanDataUnit : indx = %d\n",indx);
     CQInfo *c = &imageData->cqinfo[indx];
 
     short DCT_tcoeff[64];
@@ -467,8 +442,8 @@ void ParseHuffmanDataUnit(JPGData *imageData, int indx){
     for (int k=1; k<16; k++){
         int code = LookNBits(&imageData->buffer, k);
         
-    	//fprintf(stdout,"ParseHuffmanDataUnit : code = %d, k = %d\n",code,k);
-    	//fprintf(stdout,"ParseHuffmanDataUnit : numOfBlocks = %d\n",c->DCHT->numOfBlocks);
+    	////fprintf(stdout,"ParseHuffmanDataUnit : code = %d, k = %d\n",code,k);
+    	////fprintf(stdout,"ParseHuffmanDataUnit : numOfBlocks = %d\n",c->DCHT->numOfBlocks);
         if (IsInHuffmanCodes(code, k,  c->DCHT->numOfBlocks, c->DCHT->blocks, &decodedValue)){
             SkipNBits(&imageData->buffer, k);
             found = true;
@@ -486,17 +461,12 @@ void ParseHuffmanDataUnit(JPGData *imageData, int indx){
         }
     }
     
-    // Second, the 63 AC coefficient
     int nr=1; 
     bool EOB_found=false;
     while ( (nr<=63)&&(!EOB_found) ){
         int k = 0;
         for (k=1; k<=16; k++){
-            // Keep grabbing one bit at a time till we find one thats a huffman code
             int code = LookNBits(&imageData->buffer, k);
-
-
-            // Check if its one of our huffman codes
             if (IsInHuffmanCodes(code, k,  c->ACHT->numOfBlocks, c->ACHT->blocks, &decodedValue)){
 
                 SkipNBits(&imageData->buffer, k);
@@ -523,9 +493,6 @@ void ParseHuffmanDataUnit(JPGData *imageData, int indx){
             nr++;
         }
     }
-
-	//testing printing
-    //PrintDCT(DCT_tcoeff);
     
     for (int j = 0; j < 64; j++){
         c->DCT_buffer[j] = DCT_tcoeff[j];
@@ -558,7 +525,7 @@ inline unsigned char Clamp(int i){
         return i;
     }
 }   
-void DecodeSingleBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
+void DecodeBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
     short* inptr    = cq->DCT_buffer;
     float* quantptr = cq->qTable;
 
@@ -566,17 +533,17 @@ void DecodeSingleBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
     int tmp[64] = {0};
 	int block[64] = {0};
     
-    // Quantizing
+    // Quantize
     for (int i=0; i<64; i++){
         tmp[i] = inptr[i];
         tmp[i] = (int)( inptr[i] * quantptr[i]);
     }
-    // De-Zig-Zaging
+    // De-ZZ index
    	for( int i=0; i<64; i++){
         block[i] = tmp[ZZidx[i]];
     }
 
-    // Create an 8x8 array, Inverse DCT
+    // MCU IDCT
     int arrayBlock[8][8]={0};
     int cc = 0;
     int val[8][8]={0};
@@ -589,7 +556,7 @@ void DecodeSingleBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
     }
 
     unsigned char *outptr = outputBuf;
-    for (int y = 0; y < 8; y++) {
+    for (int y=0; y<8; y++) {
         for (int x=0; x<8; x++){
             val[x][y] += 128;
             outptr[x] = Clamp(val[x][y]);
@@ -598,7 +565,18 @@ void DecodeSingleBlock(CQInfo *cq, unsigned char *outputBuf, int stride){
     }
     
 }
-void YCrCB_to_RGB24_Block8x8(JPGData *imageData, int w, int h, int imgx, int imgy, int imgw, int imgh){
+void ConvertRGB(int y, int cb, int cr, int* r, int* g, int* b){
+    float red, green, blue;
+
+    red   = y + 1.402f*(cr-128);
+    green = y-0.34414f*(cb-128)-0.71414f*(cr-128);
+    blue  = y+1.772f*(cb-128);
+
+    *r = (int) Clamp((int)red);
+    *g = (int) Clamp((int)green);
+    *b = (int) Clamp((int)blue);
+}
+void ConvertMCU(JPGData *imageData, int w, int h, int imgx, int imgy, int imgw, int imgh){
     const unsigned char *Y, *Cb, *Cr;
 	unsigned char *pix;
     int r, g, b;
@@ -628,18 +606,30 @@ void YCrCB_to_RGB24_Block8x8(JPGData *imageData, int w, int h, int imgx, int img
             int yc =  Y[yoff];
             int cb = Cb[coff];
             int cr = Cr[coff];
-
-    		float red_pixel, green_pixel, blue_pixel;
-    		red_pixel   = y + 1.402f*(cb-128);
-    		green_pixel = y-0.34414f*(cr-128)-0.71414f*(cb-128);
-    		blue_pixel  = y+1.772f*(cr-128);
-    		
+			//fprintf(stdout,"x,y,yoff,coff : %3d %3d %3d %3d\n",x,y , yoff,coff);
+			//fprintf(stdout,"Y CbCr : %3d %3d %3d\n",yc,cb,cr);
+    		/*
+    		float red_pixel=0;
+    		float green_pixel=0;
+    		float blue_pixel=0;
+    		red_pixel   = y + 1.402f*(cr-128);
+    		green_pixel = y-0.34414f*(cb-128)-0.71414f*(cr-128);
+    		blue_pixel  = y+1.772f*(cb-128);
+			
+    		////fprintf(stdout,"R G B : %3f %3f %3f\n",red_pixel,green_pixel,blue_pixel);
     		int r = (int) Clamp((int)red_pixel);
     		int g = (int) Clamp((int)green_pixel);
     		int b = (int) Clamp((int)blue_pixel);
+    		*/
+    		int r,g,b;
+			ConvertRGB(yc,cb,cr,&r,&g,&b);
+            
             pix[0] = Clamp(r);
             pix[1] = Clamp(g);
             pix[2] = Clamp(b);
+            
+            
+			////fprintf(stdout,"R G B : %3d %3d %3d\n",pix[0],pix[1],pix[2]);
         }
     }
 }
@@ -649,25 +639,26 @@ int DecodeMCU(JPGData* imageData,int hFactor,int vFactor){
     for (int y=0; y<vFactor; y++){
         for (int x=0; x<hFactor; x++){
         	DecodeMCU_counter++;
+        	
             int stride = hFactor*8;
             int offset = x*8 + y*64*hFactor;
-
+			//fprintf(stdout,"offset = %8d\n",offset);
             ParseHuffmanDataUnit(imageData, 1);
-            DecodeSingleBlock(&imageData->cqinfo[1], &imageData->Y[offset], stride);
+            DecodeBlock(&imageData->cqinfo[1], &imageData->Y[offset], stride);
         }
     }
     // Cb
     ParseHuffmanDataUnit(imageData, 2);
-    DecodeSingleBlock(&imageData->cqinfo[2], imageData->Cb, 8);
+    DecodeBlock(&imageData->cqinfo[2], imageData->Cb, 8);
 
     // Cr
     ParseHuffmanDataUnit(imageData, 3);
-    DecodeSingleBlock(&imageData->cqinfo[3], imageData->Cr, 8);
+    DecodeBlock(&imageData->cqinfo[3], imageData->Cr, 8);
 
 	return 1;
 }
 int ParseDataBit(JPGData* imageData){
-	fprintf(stdout,"Parsing bits\n",NULL);
+	//fprintf(stdout,"Parsing bits\n",NULL);
     int hFactor = imageData->cqinfo[1].hFactor;
     int vFactor = imageData->cqinfo[1].vFactor;
 
@@ -676,12 +667,12 @@ int ParseDataBit(JPGData* imageData){
         int h = imageData->height;
         int w = imageData->width;
         
-		//fprintf(stdout,"hFactor = %d \n",hFactor );
-		//fprintf(stdout,"vFactor = %d \n",vFactor );
-		//fprintf(stdout,"h + (8*hFactor) = %d \n",h + (8*hFactor) );
-		//fprintf(stdout,"w + (8*vFactor) = %d \n",w + (8*vFactor) );
-		//fprintf(stdout,"h mod (8*hFactor)  = %d \n",h%(8*hFactor) );
-		//fprintf(stdout,"w mod (8*vFactor)  = %d \n",w%(8*vFactor) );
+		////fprintf(stdout,"hFactor = %d \n",hFactor );
+		////fprintf(stdout,"vFactor = %d \n",vFactor );
+		////fprintf(stdout,"h + (8*hFactor) = %d \n",h + (8*hFactor) );
+		////fprintf(stdout,"w + (8*vFactor) = %d \n",w + (8*vFactor) );
+		////fprintf(stdout,"h mod (8*hFactor)  = %d \n",h%(8*hFactor) );
+		////fprintf(stdout,"w mod (8*vFactor)  = %d \n",w%(8*vFactor) );
         int height = h + (8*hFactor) - (h%(8*hFactor)); //floating p exception
         int width  = w + (8*vFactor) - (w%(8*vFactor)); //floating p exception
       
@@ -712,12 +703,12 @@ int ParseDataBit(JPGData* imageData){
         	//fprintf(stdout,"(x,y) = (%3d,%3d)",x,y);
         	imageData->cspace = imageData->final_rgb + x*3 + (y *imageData->width*3);
             DecodeMCU(imageData,hFactor,vFactor);
-            YCrCB_to_RGB24_Block8x8(imageData, hFactor, vFactor, x, y, imageData->width, imageData->height);
+            ConvertMCU(imageData, hFactor, vFactor, x, y, imageData->width, imageData->height);
         }
         //fprintf(stdout,"\n",NULL);
     }
 
-    fprintf(stdout,"DecodeMCU_counter == %d\n",DecodeMCU_counter);
+    //fprintf(stdout,"DecodeMCU_counter == %d\n",DecodeMCU_counter);
     
 	return 1;
 }
@@ -741,20 +732,20 @@ void ConvertToRGB(JPGData* imageData){
             fprintf(R,"%d,",(RGB[i]));
             fprintf(G,"%d,",(RGB[i+1]));
             fprintf(B,"%d,",(RGB[i+2]));
-            //fprintf(stdout,"%d",rgbpix);
+            ////fprintf(stdout,"%d",rgbpix);
             //fwrite(&rgbpix, 3, 1, fp);
         }
         
         fprintf(R,"\n",NULL);
         fprintf(G,"\n",NULL);
         fprintf(B,"\n",NULL);
-        //fprintf(stdout,"\n",NULL);
+        ////fprintf(stdout,"\n",NULL);
     }
 	
 }
 
-void RecoverImage(JPGData* imageData){
-	fprintf(stdout,"Recovering Image\n",NULL);
+void RecoverImage(JPGData* imageData,const char* fileName_out){
+	//fprintf(stdout,"Recovering Image\n",NULL);
 	int w = imageData->width;
 	int h = imageData->height;
 	int filesize = 54 + 3*w*h;  //w is your image width, h is image height, both int
@@ -805,7 +796,7 @@ void RecoverImage(JPGData* imageData){
 		}
 	}
 	FILE *f;
-	f = fopen(OUT_1_NAME,"wb");
+	f = fopen(fileName_out,"wb");
 	fwrite(	bmpfileheader,1,14,f);
 	fwrite(bmpinfoheader,1,40,f);
 	for(i=0; i<h; i++){
@@ -816,6 +807,7 @@ void RecoverImage(JPGData* imageData){
 	
 	/****************************************************/
 	//Method 2
+	/*
 	unsigned char* RGB = imageData->final_rgb;
 	int iNumPaddedBytes = (4 - (w * 3) % 4)%4;
 
@@ -826,10 +818,10 @@ void RecoverImage(JPGData* imageData){
         for (int x=0; x<w; x++){
             int i = (x + (w)*y) * 3;
             unsigned int rgbpix = (RGB[i]<<16)|(RGB[i+1]<<8)|(RGB[i+2]<<0);
-            //fprintf(stdout,"[%3d %3d %3d],",RGB[i]<<16,RGB[i+1]<<8,RGB[i+2]<<0);
+            ////fprintf(stdout,"[%3d %3d %3d],",RGB[i]<<16,RGB[i+1]<<8,RGB[i+2]<<0);
             fwrite(&rgbpix, 3, 1, fp);
         }
-        //fprintf(stdout,"\n",NULL);
+        ////fprintf(stdout,"\n",NULL);
         if (iNumPaddedBytes>0)
         {
             unsigned char pad = 0;
@@ -837,22 +829,32 @@ void RecoverImage(JPGData* imageData){
         }
     }
     fclose(fp);
-    fprintf(stderr,"File output to output1.bmp,output2.bmp\n",NULL);
+    */
+    //fprintf(stderr,"File output to output1.bmp,output2.bmp\n",NULL);
 	
+}
+void DecodeJPG(const char* fileName){
+
+
+
 }
 int main(int argc, char *argv[]){
     FILE *fp;
     const char* fileName;
- 	const char* fileName_out;
+ 	char fileName_out[80];
  	//fprintf(stderr,"argc == %d\n", argc);
     if(argc >= 2){
     	fileName = argv[1];
     	fprintf(stderr,"Input filename is = %s\n", fileName);
     }
     else{
+
+    	fprintf(stderr,"No input filename, using 4 default pictures %s\n", fileName);
+    	
     	fileName = "teatime.jpg";
-    	fprintf(stderr,"No input filename, using default image = %s\n", fileName);
     }
+    strcat(fileName_out,fileName);
+    strcat(fileName_out,".bmp");
     //const char* fileName = "teatime.jpg";
     
     unsigned char *buffer;
@@ -876,8 +878,8 @@ int main(int argc, char *argv[]){
     	imageData->buffer = readFileToBuffer(fp,fileSize);
    		ParseHeader(imageData);
    		ParseDataBit(imageData);
-   		RecoverImage(imageData);
-    
+   		RecoverImage(imageData,fileName_out);
+    	fprintf(stderr,"Output filename is = %s\n", fileName_out);
         return 1;
     }
 }
